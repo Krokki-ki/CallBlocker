@@ -1,15 +1,9 @@
 package com.krokki.callblocker;
 
-import android.os.Bundle;
-
-import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.Toast;
@@ -33,9 +27,25 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Инициализация UI
         startStopButton = findViewById(R.id.startStopButton);
-        setupButton();
-        checkPermissions();
+        setupButton(); // Это было пропущено!
+
+        // Запрос разрешений для Android 10+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            requestPhoneStatePermission();
+        }
+    }
+
+    private void requestPhoneStatePermission() {
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.READ_PHONE_STATE},
+                    PERMISSIONS_REQUEST_CODE
+            );
+        }
     }
 
     private void setupButton() {
@@ -43,43 +53,55 @@ public class MainActivity extends AppCompatActivity {
             if (hasAllPermissions()) {
                 toggleService();
             } else {
-                checkPermissions();
+                requestAllPermissions();
             }
         });
+    }
+
+    private void requestAllPermissions() {
+        ActivityCompat.requestPermissions(
+                this,
+                REQUIRED_PERMISSIONS,
+                PERMISSIONS_REQUEST_CODE
+        );
     }
 
     private void toggleService() {
         Intent serviceIntent = new Intent(this, CallBlockerService.class);
         if (isServiceRunning) {
             stopService(serviceIntent);
-            startStopButton.setText("Старт");
-            startStopButton.setBackgroundColor(getResources().getColor(R.color.green));
+            updateButtonUi(false);
         } else {
             startService(serviceIntent);
-            startStopButton.setText("Стоп");
-            startStopButton.setBackgroundColor(getResources().getColor(R.color.red));
+            updateButtonUi(true);
         }
         isServiceRunning = !isServiceRunning;
     }
 
+    private void updateButtonUi(boolean isRunning) {
+        startStopButton.setText(isRunning ? "Стоп" : "Старт");
+        startStopButton.setBackgroundColor(
+                getResources().getColor(
+                        isRunning ? R.color.red : R.color.green
+                )
+        );
+    }
+
     private boolean hasAllPermissions() {
         for (String permission : REQUIRED_PERMISSIONS) {
-            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, permission)
+                    != PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
         }
         return true;
     }
 
-    private void checkPermissions() {
-        if (!hasAllPermissions()) {
-            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, PERMISSIONS_REQUEST_CODE);
-        }
-    }
-
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode,
+                                           String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
         if (requestCode == PERMISSIONS_REQUEST_CODE) {
             if (hasAllPermissions()) {
                 toggleService();
